@@ -1,19 +1,36 @@
 {
-  "name": "sequelize-query-string",
-  "version": "1.0.0",
-  "description": "",
+  "name": "sequelizeqp",
+  "version": "1.0.1",
+  "description": "Small library to convert express query params (or objects in general) into a syntax recognised by the Sequelize library.",
   "main": "index.js",
   "scripts": {
     "test": "cd tests && mocha"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "pagination",
+    "parser",
+    "sorting",
+    "query",
+    "express",
+    "sequelize",
+    "query-builder",
+    "query-parser"
+  ],
+  "author": "Stuart Harrison",
+  "license": "GNU GPLv3",
   "devDependencies": {
     "mocha": "^10.0.0",
     "sqlite3": "^5.0.8"
   },
   "dependencies": {
     "sequelize": "^6.21.2"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stuartaharrison/sequelize-query-parser.git"
+  },
+  "bugs": {
+    "url": "https://github.com/stuartaharrison/sequelize-query-parser/issues"
+  },
+  "homepage": "https://github.com/stuartaharrison/sequelize-query-parser#readme"
 }

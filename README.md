@@ -61,13 +61,13 @@ You can also configure your options to sort the results of your query by 1 or mo
 
 ```
 npm i --save sequelize
-// TODO: add the npm link here
+npm i --save sequelizeqp
 ```
 
 ## How to Use
 
 ```javascript
-const SequelizeQS = require(''); // TODO: add the npm bit here
+const SequelizeQS = require('sequelizeqp');
 const sequelizeParser = SequelizeQS();
 ```
 
