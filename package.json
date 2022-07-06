@@ -1,0 +1,19 @@
+{
+  "name": "sequelize-query-string",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "cd tests && mocha"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "mocha": "^10.0.0",
+    "sqlite3": "^5.0.8"
+  },
+  "dependencies": {
+    "sequelize": "^6.21.2"
+  }
+}

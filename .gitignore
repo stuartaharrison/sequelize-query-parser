@@ -102,3 +102,13 @@ dist
 
 # TernJS port file
 .tern-port
+
+# Ignore Jetbrains
+.idea
+
+# Ignore anything environment based
+.env
+.env.*
+
+# Ignore any test database
+*.sqlite
