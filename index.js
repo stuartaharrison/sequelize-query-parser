@@ -23,6 +23,9 @@ class SequelizeQS {
     constructor(options) {
         this.opt = options || {}
         this.ops = this.opt.ops || Object.keys(this.#opMaps);
+        this.alias = this.opt.alias || {};
+        this.blacklist = this.opt.blacklist || [];
+        this.customHandlers = this.opt.custom || {};
         this.defaultPaginationLimit = this.opt.defaultPaginationLimit || 25;
         this.maximumPageSize = this.opt.maximumPageSize || 100;
 
@@ -109,50 +112,79 @@ class SequelizeQS {
 
     #parseWhereProperties(properties) {
         let where = {};
-        Object.keys(properties).forEach((k) => {
-            let key = k;
+        let columns = Object.keys(properties);
+
+        for (const column of columns) {
+            let key = this.alias[column] || column; // handles an alias
+            console.log('column', column);
             let value = properties[key];
 
-            // check we have an actual value set here
-            if (!value 
-                || value.length === 0 
-                || (
-                    typeof (value) === 'string' 
-                    && value.toLowerCase() === 'null'
-                )) {
-                // checks the value to see if it is null
-                let { operation } = handleBasicComparator('is', key, null, this.opt);
-                value = operation;
+            // check the blacklist
+            if (this.blacklist.some(el => el === key)) {
+                break;
             }
-            else if (typeof (value) === 'string') {
-                if (value === '!' || value.toLowerCase() === '!null') {
-                    // checks to see if the field IS NOT NULL
-                    let { operation } = handleBasicComparator('is not', key, null, this.opt);
-                    value = operation;
-                }
-                else if (this.ops.some(op => value.startsWith(op))) {
-                    let op = this.ops.find(op => value.startsWith(op));
-                    let fn = this.#opMaps[op];
 
-                    if (!fn || !typeof (fn) === 'function') {
-                        throw 'Operation is not a function';
-                    }
-                    
-                    const { operation } = fn(op, key, value, this.opt);
-                    value = operation;
-                }
-                else {
-                    // this is just a straight up value/equals key-value pair
-                    let { operation } = handleBasicComparator('=', key, value, this.opt);
-                    value = operation;
-                }
+            // TODO: do we need to check for whitelist & let more dangerous query run?
+
+            // handles a custom function when we want to override the base functionality
+            if (this.customHandlers[key] && typeof(this.customHandlers[key]) === 'function') {
+                // call the custom handler function and get the operation to apply
+                let customOperation = this.customHandlers[key](key, value, this.opt);
+                where = {
+                    ...where,
+                    [key]: customOperation
+                };
+
+                break;
             }
-            
+
+            // handle when no value is supplied (e.g. `?maxAge=`)
+            if (!value || value.length === 0 || (typeof(value) === 'string' && value.toLowerCase() === 'null')) {
+                let { operation } = handleBasicComparator('is', key, null, this.opt);
+                where = {
+                    ...where,
+                    [key]: operation
+                };
+
+                break;
+            }
+
+            // handle when a NOT value is supplied (so when not null sort of a thing) (e.g. `?maxAge=!` or `?maxAge=!null`)
+            if (typeof(value) === 'string' && (value === '!' || value.toLowerCase() === '!null')) {
+                let { operation } = handleBasicComparator('is not', key, null, this.opt);
+                where = {
+                    ...where,
+                    [key]: operation
+                };
+
+                break;
+            }
+
+            // check if we have an operator to handle a special type (not a basic `=` equals basically)
+            if (typeof(value) === 'string' && this.ops.some(op => value.startsWith(op))) {
+                let op = this.ops.find(op => value.startsWith(op));
+                let fn = this.#opMaps[op];
+
+                if (!fn || !typeof (fn) === 'function') {
+                    throw 'Operation is not a function';
+                }
+                
+                let { operation } = fn(op, key, value, this.opt);
+                where = {
+                    ...where,
+                    [key]: operation
+                };
+
+                break;
+            }
+
+            // finally, we will just default to the basic equals operation
+            let { operation } = handleBasicComparator('=', key, value, this.opt);
             where = {
                 ...where,
-                [key]: value
+                [key]: operation
             };
-        });
+        }
 
         return where;
     }
