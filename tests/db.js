@@ -5,7 +5,7 @@ const customers = [
     { name: 'Gabby Fitz', age: 22, totalWealth: 128.65, lastLogin: new Date('2022-07-06'), isActive: false  },
     { name: 'Malvina Al', age: 19, totalWealth: 79.01, lastLogin: new Date('2022-07-06'), isActive: false },
     { name: 'Topher Gage', age: 18, totalWealth: 12.50, lastLogin: null, isActive: true },
-    { name: 'Percival Emery', age: 26, totalWealth: 697.02, lastLogin: new Date('2022-05-28'), isActive: true },
+    { name: 'Percival Emery', age: 26, totalWealth: 697.02, lastLogin: new Date('2022-05-28 15:34:11'), isActive: true },
     { name: 'Rosalind Edmund', age: 31, totalWealth: 1024, lastLogin: new Date('2022-06-12'), isActive: false },
     { name: 'Sherlyn Axel', age: 44, totalWealth: 10000.99, lastLogin: new Date('2021-12-18'), isActive: false },
     { name: 'Satchel Veva', age: 49, totalWealth: 10001.12, lastLogin: new Date('2021-11-03'), isActive: true },
@@ -15,7 +15,8 @@ const customers = [
 
 const sequelize = new Sequelize({
     dialect: 'sqlite',
-    storage: './db.sqlite'
+    storage: './db.sqlite',
+    logging: true
 });
 
 const connect = async () => {
@@ -40,7 +41,7 @@ const connect = async () => {
                 defaultValue: 0
             },
             lastLogin: {
-                type: DataTypes.DATEONLY,
+                type: DataTypes.DATE,
                 allowNull: true,
                 defaultValue: null
             },

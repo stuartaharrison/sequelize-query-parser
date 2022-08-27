@@ -1,12 +1,38 @@
 'use strict';
-const { Op } = require('sequelize');
+const { 
+    handleBasicComparator,
+    handleBetweenOperation,
+    handleInComparator
+} = require('./operations');
 
 class SequelizeQS {
+    #opMaps = {
+        '$in': handleInComparator, 
+        '$nin': handleInComparator, 
+        '$': handleBasicComparator, 
+        '!': handleBasicComparator, 
+        '|': handleBetweenOperation, 
+        '^': handleBasicComparator, 
+        '~': handleBasicComparator, 
+        '>=': handleBasicComparator, 
+        '>': handleBasicComparator, 
+        '<=': handleBasicComparator, 
+        '<': handleBasicComparator
+    };
+
     constructor(options) {
         this.opt = options || {}
-        this.ops = this.opt.ops || ['$in', '$nin', '$', '!', '|', '^', '~', '>=', '>', '<=', '<'];
+        this.ops = this.opt.ops || Object.keys(this.#opMaps);
         this.defaultPaginationLimit = this.opt.defaultPaginationLimit || 25;
         this.maximumPageSize = this.opt.maximumPageSize || 100;
+
+        if (!this.opt.dateFields) {
+            this.opt.dateFields = ['createdAt', 'updatedAt'];
+        }
+
+        if (!(typeof(this.opt.dateOnlyCompare) === 'boolean')) {
+            this.opt.dateOnlyCompare = false;
+        }
     }
 
     parse(queryObj) {
@@ -29,92 +55,6 @@ class SequelizeQS {
             retval['limit'] = pagination.limit;
         }
 
-        return retval;
-    }
-
-    #parseOperation(valueString) {
-        // find the operation we are going to apply to this value
-        // then strip the operation from the actual value we want to compare
-        const op = this.ops.find((el) => valueString.startsWith(el));
-        const strippedValue = valueString.substring(op.length);
-
-        // parse the value correctly and then setup our return object that contains the parsed information
-        const value = this.#parseToCorrectValueType(strippedValue);
-        const retval = { op, value };
-
-        // this flag helps adjust how the parsed object returning looks like
-        // some where operations will be slightly more complex and require an object of operations instead of "field not in", etc
-        let fieldIsOperation = true;
-        switch (op) {
-            case '$in':
-                // IN array
-                retval.field = Op.in;
-                retval.value = strippedValue.split('|').map((e) => this.#parseToCorrectValueType(e));
-                break;
-            case '$nin':
-                // NOT IN array
-                retval.field = Op.notIn;
-                retval.value = strippedValue.split('|').map((e) => this.#parseToCorrectValueType(e));
-                break;
-            case '$':
-                // ends with
-                retval.field = Op.endsWith;
-                break;
-            case '!':
-                // unequal
-                retval.field = Op.ne;
-                break;
-            case '|':
-                // between a min & max value
-                let aValue = strippedValue.split('|');
-                let minValue = this.#parseToCorrectValueType(aValue[0]);
-                let maxValue = this.#parseToCorrectValueType(aValue[1]);
-
-                fieldIsOperation = false;
-                retval.field = {
-                    [Op.gte]: minValue,
-                    [Op.lte]: maxValue
-                };
-                break;
-            case '^':
-                // starts with
-                retval.field = Op.startsWith;
-                break;
-            case '~':
-                // contains value
-                retval.field = Op.like;
-                retval.value = `%${retval.value}%`;
-                break;
-            case '>':
-                // greater than
-                retval.field = Op.gt;
-                break;
-            case '>=':
-                // greater than or equal
-                retval.field = Op.gte;
-                break;
-            case '<':
-                // less than
-                retval.field = Op.lt;
-                break;
-            case '<=':
-                // less than or equal
-                retval.field = Op.lte;
-                break;
-            default:
-                // default to equals
-                retval.field = Op.eq;
-        }
-
-        // setup the operation object structure that mongoose (and mongodb in general) is looking for
-        if (fieldIsOperation === true) {
-            retval.parsed = {};
-            retval.parsed[retval.field] = retval.value;
-        }
-        else {
-            retval.parsed = retval.field;
-        }
-        
         return retval;
     }
 
@@ -167,62 +107,44 @@ class SequelizeQS {
         return retval;
     }
 
-    #parseToCorrectValueType(value) {
-        if (typeof (value) === 'string') {
-            if (!value || value.length === 0 || value.toLowerCase() === 'null') {
-                return null;
-            }
-            else if (value.toLowerCase() === 'false') {
-                return false;
-            }
-            else if (value.toLowerCase() === 'true') {
-                return true;
-            }
-            else if (!isNaN(value)) {
-                return Number(value);
-            }
-            else if (new Date(value) !== "Invalid Date" && !isNaN(new Date(value))) {
-                return new Date(value);
-            }
-            return value;
-        }
-        return value;
-    }
-
     #parseWhereProperties(properties) {
         let where = {};
-
         Object.keys(properties).forEach((k) => {
             let key = k;
             let value = properties[key];
 
             // check we have an actual value set here
-            if (!value || value.length === 0) {
-                value = {
-                    [Op.is]: null
-                };
+            if (!value 
+                || value.length === 0 
+                || (
+                    typeof (value) === 'string' 
+                    && value.toLowerCase() === 'null'
+                )) {
+                // checks the value to see if it is null
+                let { operation } = handleBasicComparator('is', key, null, this.opt);
+                value = operation;
             }
             else if (typeof (value) === 'string') {
-                if (value.toLowerCase() === 'null') {
-                    // this means check if the value IS NULL
-                    value = {
-                        [Op.is]: null
-                    };
-                }
-                else if (value === '!' || value.toLowerCase() === '!null') {
+                if (value === '!' || value.toLowerCase() === '!null') {
                     // checks to see if the field IS NOT NULL
-                    value = {
-                        [Op.not]: null
-                    };
+                    let { operation } = handleBasicComparator('is not', key, null, this.opt);
+                    value = operation;
                 }
                 else if (this.ops.some(op => value.startsWith(op))) {
-                    // checks to see if our value has a modifier to adjust the query in some way
-                    let op = this.#parseOperation(value);
-                    value = op.parsed;
+                    let op = this.ops.find(op => value.startsWith(op));
+                    let fn = this.#opMaps[op];
+
+                    if (!fn || !typeof (fn) === 'function') {
+                        throw 'Operation is not a function';
+                    }
+                    
+                    const { operation } = fn(op, key, value, this.opt);
+                    value = operation;
                 }
                 else {
                     // this is just a straight up value/equals key-value pair
-                    value = this.#parseToCorrectValueType(value);
+                    let { operation } = handleBasicComparator('=', key, value, this.opt);
+                    value = operation;
                 }
             }
             
