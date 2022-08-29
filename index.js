@@ -116,7 +116,6 @@ class SequelizeQS {
 
         for (const column of columns) {
             let key = this.alias[column] || column; // handles an alias
-            console.log('column', column);
             let value = properties[key];
 
             // check the blacklist
@@ -132,7 +131,7 @@ class SequelizeQS {
                 let customOperation = this.customHandlers[key](key, value, this.opt);
                 where = {
                     ...where,
-                    [key]: customOperation
+                    ...customOperation
                 };
 
                 break;

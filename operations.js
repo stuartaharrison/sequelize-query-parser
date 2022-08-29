@@ -24,7 +24,8 @@ const comparatorMap = {
 
 const handleBasicComparator = (operationStr, column, value, options) => {
     // check & strip if we have the comparator at the start
-    let strippedValue = (value && value.startsWith(operationStr))
+    console.log('VALUE', value);
+    let strippedValue = (value && typeof(value) === 'string' && value.startsWith(operationStr))
         ? value.substring(operationStr.length)
         : value;
 

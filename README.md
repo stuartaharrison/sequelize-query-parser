@@ -9,6 +9,10 @@ Accept query parameters in express or similar libraries and convert them into sy
 * Basic & Multiple-Column Sorting support. Query and sort your results by 1-or-more columns.
 * Parses string input to integers, floats, booleans and dates.
 * Accepts non-string values (though from express it will likely come through as a string type anyway).
+* Allows specified DATETIME fields to be compared on the DATE-part only.
+* Blacklisting.
+* Aliasing.
+* Custom handlers for specific column/query-key names.
 
 ### Operations
 
@@ -32,6 +36,59 @@ Accept query parameters in express or similar libraries and convert them into sy
 _You can see the configuration section to see how the operations can be configured_
 
 _**Note:** I use `[Op.gte]` & `[Op.lte]` instead of `[Op.between]` to handle dates and other types better. I will investigate if the latter is a better option._
+
+### Aliasing & Blacklisting
+By setting a column/property value into the Blacklist, you are telling the parser to simply ignore the key-value pair and not include it in the final output. With Aliasing, you can convert a specific incoming key-value pair to match the name of a known column. For example, converting incoming `personsAge=12` to `age=12`. Both of these can be configured in the initialise options.
+
+```javascript
+const sequelizeDateQS = new SequelizeQS({
+    blacklist: ['createdAt'],
+    alias: {
+        'personsAge': 'age'
+    }
+});
+```
+
+### Date Only
+You can now easily (as of v1.1.0) have specific Date-type columns converted to compare on the Date only instead of including the Timestamp. DATEONLY fields in Sqlite are still working as they did before though!
+
+To prevent breaking changes from prior versions and to also not rely on guess working with the code, you will need to specify what columns in your Sequelize model are actual Date columns you want to be handled in this way. You must also enable this feature by setting the `dateOnlyCompare` property in the options to `true`.
+
+```javascript
+const sequelizeDateQS = new SequelizeQS({
+    dateOnlyCompare: true,
+    dateFields: ['createdAt', 'updatedAt', 'lastLogin']
+});
+```
+
+Now when we compare on the `lastLogin` column, our query can come out like;
+
+```mysql
+SELECT count(*) AS `count` FROM `customers` AS `customers` WHERE date(`lastLogin`) LIKE '2021-%';
+```
+
+By default, `dateOnlyCompare` will be `false` and the initial array value for `dateFields` will contain the original timestamp columns that sequelize typically adds to your models by default (createdAt & updatedAt).
+
+### Custom Handlers
+A big improvement over the initial version is the ability to have the parser handle specific columns/query string properties in a specific way. This is configured through the initial options when setting up the parser.
+
+Please note, that the value your custom function must return is one that would be interpreted by the Sequelize library. You can see an example below for more details;
+
+```javascript
+const { Op } = require('sequelize');
+
+const minimumAgeHandler = (column, value, options) => {
+    return {
+        'age': [Op.gte]: value
+    }
+};
+
+const sequelizeDateQS = new SequelizeQS({
+    customHandlers: {
+        minAge: minimumAgeHandler
+    }
+});
+```
 
 ### Pagination
 
@@ -73,13 +130,19 @@ const sequelizeParser = SequelizeQS();
 
 ### Configuration Options
 
-You can pass additional configuration options into the constructor for the parser. This will change how the parser operations. **This is currently pretty experimental and does not have all the options available. You should be cautious with the order of operations otherwise you might get some unintended results!**
+You can pass additional configuration options into the constructor for the parser. This will change how the parser operations. **As of Version 1.1, this have been a little more fleshed out. However, This is currently pretty experimental and does not have all the options available. You should be cautious with the order of operations otherwise you might get some unintended results!**
 
 | property               | decription                                                                   | default |
 |------------------------|------------------------------------------------------------------------------|--------------|
 | ops                    | The available operations.                                                    | `['$in', '$nin', '$', '!', '\|', '^', '~', '>=', '>', '<=', '<']` |
+| alias | The alias matching for properties and db columns. | `{ }` |
+| blacklist | The list of columns that should be ignored and not compared on | `[ ]` |
+| customHandlers | List of available custom handlers for specific columns | `{ }` |
+| dateOnlyCompare | Tells the parser to convert recognised `datetime fields` to `date-only` for comparisons | `false` |
+| dateFields | List of date columns in your model that are datetime type fields | `['createdAt', 'updatedAt']` |
 | defaultPaginationLimit | Limit to default too when no limit is set or maximum size has been exceeded. | `25` |
 | maximumPageSize        | The maximum page size allowed.                  | `100` |
+
 
 ### Parse
 
@@ -111,9 +174,10 @@ This library was primarily built for myself when building multiple small API's a
 Some features that I have thought about but not necessarily implemented include;
 
 * complex queries with AND & OR operators.
-* white & blacklist for specific parameter names.
-* custom functions that execute when a specific parameter is included.
+* ~~white & blacklist for specific parameter names.~~
+* ~~custom functions that execute when a specific parameter is included.~~
 * advanced sorting by functions (e.g. ordering by max(age))
+* ~~DATE-only comparison.~~
 
 ## Collaborators
 

@@ -1,6 +1,6 @@
 {
   "name": "sequelizeqp",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Small library to convert express query params (or objects in general) into a syntax recognised by the Sequelize library.",
   "main": "index.js",
   "scripts": {
