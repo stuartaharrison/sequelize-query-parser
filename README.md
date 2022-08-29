@@ -79,7 +79,9 @@ const { Op } = require('sequelize');
 
 const minimumAgeHandler = (column, value, options) => {
     return {
-        'age': [Op.gte]: value
+        'age': {
+            [Op.gte]: value
+        }
     }
 };
 

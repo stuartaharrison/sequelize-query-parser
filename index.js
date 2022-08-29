@@ -21,19 +21,38 @@ class SequelizeQS {
     };
 
     constructor(options) {
+        // check and configure all the options are okay
         this.opt = options || {}
-        this.ops = this.opt.ops || Object.keys(this.#opMaps);
-        this.alias = this.opt.alias || {};
-        this.blacklist = this.opt.blacklist || [];
-        this.customHandlers = this.opt.custom || {};
-        this.defaultPaginationLimit = this.opt.defaultPaginationLimit || 25;
-        this.maximumPageSize = this.opt.maximumPageSize || 100;
 
-        if (!this.opt.dateFields) {
+        if (!this.opt.ops || !Array.isArray(this.opt.ops)) {
+            this.opt.ops = Object.keys(this.#opMaps);
+        }
+
+        if (!this.opt.alias || typeof(this.opt.alias) !== 'object') {
+            this.opt.alias = {};
+        }
+
+        if (!this.opt.blacklist || !Array.isArray(this.opt.blacklist)) {
+            this.opt.blacklist = [];
+        }
+
+        if (!this.opt.customHandlers || typeof(this.opt.customHandlers) !== 'object') {
+            this.opt.customHandlers = {};
+        }
+
+        if (!this.opt.defaultPaginationLimit || isNaN(this.opt.defaultPaginationLimit)) {
+            this.opt.defaultPaginationLimit = 25;
+        }
+
+        if (!this.opt.maximumPageSize || isNaN(this.opt.maximumPageSize)) {
+            this.opt.maximumPageSize = 100;
+        }
+
+        if (!this.opt.dateFields || !Array.isArray(this.opt.dateFields)) {
             this.opt.dateFields = ['createdAt', 'updatedAt'];
         }
 
-        if (!(typeof(this.opt.dateOnlyCompare) === 'boolean')) {
+        if (!this.opt.dateOnlyCompare || typeof(this.opt.dateOnlyCompare) !== 'boolean') {
             this.opt.dateOnlyCompare = false;
         }
     }
@@ -62,8 +81,10 @@ class SequelizeQS {
     }
 
     #parsePagination(page, limit) {
+        const { defaultPaginationLimit, maximumPageSize } = this.opt;
+
         let realPage = page || 1;
-        let realLimit = limit || this.defaultPaginationLimit;
+        let realLimit = limit || defaultPaginationLimit;
 
         // prevent negative page number
         try {
@@ -79,12 +100,12 @@ class SequelizeQS {
         // prevent negative limit value or trying to get too many
         try {
             realLimit = parseInt(limit);
-            if (isNaN(realLimit) || realLimit < 1 || (this.maximumPageSize && realLimit > this.maximumPageSize)) {
-                realLimit = this.defaultPaginationLimit;
+            if (isNaN(realLimit) || realLimit < 1 || (maximumPageSize && realLimit > maximumPageSize)) {
+                realLimit = defaultPaginationLimit;
             }
         }
         catch {
-            realLimit = this.defaultPaginationLimit;
+            realLimit = defaultPaginationLimit;
         }
 
         return { page: realPage, limit: realLimit };
@@ -113,22 +134,23 @@ class SequelizeQS {
     #parseWhereProperties(properties) {
         let where = {};
         let columns = Object.keys(properties);
+        const { alias, blacklist, customHandlers, ops } = this.opt;
 
         for (const column of columns) {
-            let key = this.alias[column] || column; // handles an alias
-            let value = properties[key];
+            let key = alias[column] || column; // handles an alias
+            let value = properties[column];
 
             // check the blacklist
-            if (this.blacklist.some(el => el === key)) {
+            if (blacklist.some(el => el === key)) {
                 break;
             }
 
             // TODO: do we need to check for whitelist & let more dangerous query run?
 
             // handles a custom function when we want to override the base functionality
-            if (this.customHandlers[key] && typeof(this.customHandlers[key]) === 'function') {
+            if (customHandlers[key] && typeof(customHandlers[key]) === 'function') {
                 // call the custom handler function and get the operation to apply
-                let customOperation = this.customHandlers[key](key, value, this.opt);
+                let customOperation = customHandlers[key](key, value, this.opt);
                 where = {
                     ...where,
                     ...customOperation
@@ -160,8 +182,8 @@ class SequelizeQS {
             }
 
             // check if we have an operator to handle a special type (not a basic `=` equals basically)
-            if (typeof(value) === 'string' && this.ops.some(op => value.startsWith(op))) {
-                let op = this.ops.find(op => value.startsWith(op));
+            if (typeof(value) === 'string' && ops.some(op => value.startsWith(op))) {
+                let op = ops.find(op => value.startsWith(op));
                 let fn = this.#opMaps[op];
 
                 if (!fn || !typeof (fn) === 'function') {

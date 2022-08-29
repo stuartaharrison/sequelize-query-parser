@@ -1,11 +1,13 @@
 const connect = require('./db');
 const assert = require('assert');
+const { Op } = require('sequelize');
 const SequelizeQS = require('../index');
 
 let models = null;
 let sequelize = null;
 let sequelizeQS = null;
 let sequelizeDateQS = null;
+let sequelizeCustomQS = null;
 
 before(async () => {
     sequelize = await connect();
@@ -13,10 +15,28 @@ before(async () => {
 });
 
 beforeEach(() => {
+    // setup a basic parser
     sequelizeQS = new SequelizeQS();
+
+    // setup a parser that handlers dates as DATEONLY basically
     sequelizeDateQS = new SequelizeQS({
         dateOnlyCompare: true,
         dateFields: ['createdAt', 'updatedAt', 'lastLogin']
+    });
+
+    // setup a parser that handlers blacklists, aliases and custom handlers
+    sequelizeCustomQS = new SequelizeQS({
+        blacklist: ['isActive'],
+        alias: { 'customerAge': 'age' },
+        customHandlers: {
+            minAge: (column, value, options) => {
+                return {
+                    'age': {
+                        [Op.gte]: value
+                    }
+                }
+            }
+        }
     });
 });
 
@@ -321,6 +341,36 @@ describe('Operations - Date Only', () => {
             let countResult = await models.customers.count(options);
             assert.equal(countResult, 3);
         });
+    });
+});
+
+describe('Alias', () => {
+    it('should return 4', async () => {
+        let options = sequelizeCustomQS.parse({
+            customerAge: '|20|30'
+        });
+        let countResult = await models.customers.count(options);
+        assert.equal(countResult, 4);
+    });
+});
+
+describe('Blacklist', () => {
+    it('should return 10', async () => {
+        let options = sequelizeCustomQS.parse({
+            isActive: false
+        });
+        let countResult = await models.customers.count(options);
+        assert.equal(countResult, 10);
+    });
+});
+
+describe('Custom Handlers', () => {
+    it('should return 4', async () => {
+        let options = sequelizeCustomQS.parse({
+            minAge: 30
+        });
+        let countResult = await models.customers.count(options);
+        assert.equal(countResult, 4);
     });
 });
 
